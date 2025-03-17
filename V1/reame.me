@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Scanner</title>
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        #response {
+            padding: 10px;
+            margin-top: 20px;
+            background-color: lightgray;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        #video {
+            width: 100%;
+            max-width: 600px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Barcode Scanner</h1>
+        <label for="panel">Select Panel</label>
+        <select id="panel">
+            <option value="Amazon">Amazon</option>
+            <option value="Flipkart">Flipkart</option>
+            <option value="Meesho">Meesho</option>
+            <option value="Other">Other</option>
+        </select>
+        <button id="cameraButton">Open Camera</button>
+        <video id="video" autoplay></video>
+
+        <label for="tracking_id">Tracking ID (Barcode or Manual Entry)</label>
+        <input type="text" id="tracking_id" placeholder="Enter or Scan Tracking ID">
+        
+        <button id="submitButton">Submit</button>
+        <button id="nextButton" style="display: none;">Next Scan</button>
+
+        <div id="response"></div>
+    </div>
+
+    <script>
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        let video = document.getElementById("video");
+        let beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
+
+        document.getElementById("cameraButton").addEventListener("click", function() {
+            video.style.display = "block";
+            startCamera();
+        });
+
+        function startCamera() {
+            codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
+                if (result) {
+                    document.getElementById("tracking_id").value = result.text;
+                    beep.play();
+                    stopCamera();
+                    submitForm();
+                }
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error("ZXing Error: ", err);
+                }
+            });
+        }
+
+        function stopCamera() {
+            codeReader.reset();
+            video.srcObject = null;
+            video.style.display = "none";
+        }
+
+        function submitForm() {
+            let tracking_id = document.getElementById("tracking_id").value.trim();
+            let panel = document.getElementById("panel").value;
+            
+            if (!tracking_id) {
+                alert("Tracking ID is required!");
+                return;
+            }
+
+            fetch("http://127.0.0.1:5000/scan_item", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tracking_id, panel })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("response").innerText = data.message;
+                if (data.message.includes("successfully")) {
+                    document.getElementById("response").className = "success";
+                } else {
+                    document.getElementById("response").className = "error";
+                }
+                resetForm();
+            })
+            .catch(err => {
+                document.getElementById("response").innerText = "Error: " + err;
+                document.getElementById("response").className = "error";
+            });
+        }
+
+        function resetForm() {
+            document.getElementById("tracking_id").value = "";
+            document.getElementById("cameraButton").style.display = "block";
+            document.getElementById("nextButton").style.display = "none";
+        }
+
+        document.getElementById("nextButton").addEventListener("click", function() {
+            resetForm();
+            startCamera();
+        });
+    </script>
+</body>
+</html>
+
+

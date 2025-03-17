@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Scanner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 500px;
+            display: none;
+            margin-top: 20px;
+        }
+        #cameraButton, #submitButton {
+            padding: 10px 20px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        #panelSelect {
+            padding: 5px;
+            margin-top: 10px;
+        }
+        #tracking_id {
+            padding: 5px;
+            width: 200px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Barcode Scanner</h1>
+
+    <!-- Panel Selection Dropdown -->
+    <label for="panelSelect">Select Panel:</label>
+    <select id="panelSelect">
+        <option value="Amazon">Amazon</option>
+        <option value="Flipkart">Flipkart</option>
+    </select>
+
+    <!-- Button to Open Camera -->
+    <button id="cameraButton">Open Camera</button>
+
+    <!-- Video Element for Camera Stream -->
+    <video id="video"></video>
+
+    <!-- Tracking ID Input Field -->
+    <h3>Tracking ID (Barcode or Manual Entry)</h3>
+    <input type="text" id="tracking_id" placeholder="Enter or Scan Tracking ID">
+
+    <!-- Submit Button -->
+    <button id="submitButton">Submit</button>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const video = document.getElementById("video");
+            const cameraButton = document.getElementById("cameraButton");
+            const submitButton = document.getElementById("submitButton");
+            const trackingIdInput = document.getElementById("tracking_id");
+            const panelSelect = document.getElementById("panelSelect");
+
+            // Function to Start Camera and Barcode Scanner
+            function startCamera() {
+                Quagga.init(
+                    {
+                        inputStream: {
+                            name: "Live",
+                            type: "LiveStream",
+                            target: video,
+                            constraints: { facingMode: "environment" } // Use the rear camera
+                        },
+                        decoder: {
+                            readers: ["code_128_reader", "ean_reader", "upc_reader"] // Supported barcode formats
+                        }
+                    },
+                    function (err) {
+                        if (err) {
+                            console.error("Camera Error:", err);
+                            alert("Camera failed to start. Check permissions or try again.");
+                            return;
+                        }
+                        console.log("Camera and Quagga initialized successfully.");
+                        video.style.display = "block"; // Show the video element
+                        Quagga.start();
+                    }
+                );
+
+                // Event Listener for Barcode Detection
+                Quagga.onDetected(function (result) {
+                    const code = result.codeResult.code;
+                    console.log("Barcode detected:", code);
+                    trackingIdInput.value = code; // Populate the tracking ID input
+                    stopCamera(); // Stop the camera after detection
+                    playBeep(); // Play a beep sound
+                    submitForm(); // Automatically submit the form
+                });
+            }
+
+            // Function to Stop Camera
+            function stopCamera() {
+                Quagga.stop();
+                video.srcObject = null;
+                video.style.display = "none"; // Hide the video element
+            }
+
+            // Function to Play a Beep Sound
+            function playBeep() {
+                const beep = new Audio("https://www.myinstants.com/media/sounds/beep.mp3");
+                beep.play();
+            }
+
+            // Function to Submit the Form
+            function submitForm() {
+                const trackingID = trackingIdInput.value.trim();
+                const panel = panelSelect.value;
+
+                if (!trackingID) {
+                    alert("Please enter or scan a tracking ID!");
+                    return;
+                }
+
+                // Send data to the Flask backend
+                fetch("http://127.0.0.1:5000/scan_item", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ panel: panel, tracking_id: trackingID })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message); // Show success or error message
+                    trackingIdInput.value = ""; // Clear the input field
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("An error occurred while submitting the data.");
+                });
+            }
+
+            // Event Listeners
+            cameraButton.addEventListener("click", startCamera);
+            submitButton.addEventListener("click", submitForm);
+        });
+    </script>
+</body>
+</html>

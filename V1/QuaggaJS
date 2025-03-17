@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Scanner</title>
+
+    <!-- QuaggaJS for barcode scanning -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        #response {
+            padding: 10px;
+            margin-top: 20px;
+            background-color: lightgray;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        #scanner-container {
+            display: none;
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+        }
+        video {
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Barcode Scanner</h1>
+        <label for="panel">Select Panel</label>
+        <select id="panel">
+            <option value="Amazon">Amazon</option>
+            <option value="Flipkart">Flipkart</option>
+            <option value="Meesho">Meesho</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <button id="cameraButton">Open Camera</button>
+        <button id="stopCameraButton" style="display: none;">Stop Camera</button>
+
+        <div id="scanner-container">
+            <video id="video"></video>
+        </div>
+
+        <label for="tracking_id">Tracking ID (Barcode or Manual Entry)</label>
+        <input type="text" id="tracking_id" placeholder="Enter or Scan Tracking ID">
+        
+        <button id="submitButton">Submit</button>
+        <button id="nextButton" style="display: none;">Next Scan</button>
+
+        <div id="response"></div>
+    </div>
+
+    <script>
+        let scannerContainer = document.getElementById("scanner-container");
+        let cameraButton = document.getElementById("cameraButton");
+        let stopCameraButton = document.getElementById("stopCameraButton");
+
+        // Start QuaggaJS
+        function startScanner() {
+            scannerContainer.style.display = "block";
+            stopCameraButton.style.display = "block";
+            cameraButton.style.display = "none";
+
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: scannerContainer,
+                    constraints: {
+                        width: 600,
+                        height: 400,
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader"]
+                }
+            }, function(err) {
+                if (err) {
+                    console.error("QuaggaJS Initialization Error:", err);
+                    return;
+                }
+                Quagga.start();
+            });
+
+            Quagga.onDetected(function(result) {
+                let code = result.codeResult.code;
+                document.getElementById("tracking_id").value = code;
+                beepSound();
+                stopScanner();
+                submitForm();
+            });
+        }
+
+        // Stop QuaggaJS
+        function stopScanner() {
+            Quagga.stop();
+            scannerContainer.style.display = "none";
+            stopCameraButton.style.display = "none";
+            cameraButton.style.display = "block";
+        }
+
+        // Beep sound on successful scan
+        function beepSound() {
+            let beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
+            beep.play();
+        }
+
+        // Submit form data to Flask API
+        function submitForm() {
+            let tracking_id = document.getElementById("tracking_id").value.trim();
+            let panel = document.getElementById("panel").value;
+            
+            if (!tracking_id) {
+                alert("Tracking ID is required!");
+                return;
+            }
+
+            fetch("http://127.0.0.1:5000/scan_item", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tracking_id, panel })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("response").innerText = data.message;
+                if (data.message.includes("successfully")) {
+                    document.getElementById("response").className = "success";
+                } else {
+                    document.getElementById("response").className = "error";
+                }
+                resetForm();
+            })
+            .catch(err => {
+                document.getElementById("response").innerText = "Error: " + err;
+                document.getElementById("response").className = "error";
+            });
+        }
+
+        function resetForm() {
+            document.getElementById("tracking_id").value = "";
+            cameraButton.style.display = "block";
+            stopCameraButton.style.display = "none";
+            scannerContainer.style.display = "none";
+        }
+
+        document.getElementById("cameraButton").addEventListener("click", startScanner);
+        document.getElementById("stopCameraButton").addEventListener("click", stopScanner);
+        document.getElementById("nextButton").addEventListener("click", resetForm);
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ZXing Example</title>
+    <!-- Add this line to include the ZXing library -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
+    <!-- ... other head content ... -->
+  </head>
+  <body>
+    <!-- ... your body content ... -->
+    <script>
+      // ... Your existing JavaScript code ...
+      const codeReader = new ZXing.BrowserMultiFormatReader();
+      let video = document.getElementById("video");
+      let beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
+
+      document
+        .getElementById("cameraButton")
+        .addEventListener("click", function () {
+          video.style.display = "block";
+          startCamera();
+        });
+    </script>
+  </body>
+</html>
